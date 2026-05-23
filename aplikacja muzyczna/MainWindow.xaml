@@ -35,30 +35,65 @@
                   IsReadOnly="True"
                   SelectionMode="Single"
                   MouseDoubleClick="FilesList_MouseDoubleClick"
+                  
                   >
             <DataGrid.Columns>
-                <DataGridTemplateColumn Width="48">
+                <DataGridTemplateColumn Header="Cover" Width="48">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <Image Source="{Binding CoverSmall}" Width="32" Height="32" Stretch="UniformToFill"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="Nazwa" Binding="{Binding Name}" Width="*"/>
-                <DataGridTextColumn Header="Długość" Binding="{Binding DisplayDuration}" Width="80"/>
-                <DataGridTextColumn Header="Wykonawca" Binding="{Binding Performer}" Width="100"/>
-                <DataGridTextColumn Header="Album" Binding="{Binding Album}" Width="100"/>
+                <DataGridTextColumn Header="Nazwa" Binding="{Binding Name}" Width="*">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Długość" Binding="{Binding DisplayDuration}" Width="auto">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Wykonawca" Binding="{Binding Performer}" Width="120">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Album" Binding="{Binding Album}" Width="200">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
             </DataGrid.Columns>
         </DataGrid>
+        
 
         <StackPanel Grid.Row="3" Grid.Column="0">
-            <Button FontSize="15" HorizontalAlignment="Left" Name="btnOpenAudioFileButton" Click="btnOpenAudioFile_Click" Margin="10">Open Audio Folder</Button>
+            <Button FontSize="15" HorizontalAlignment="Left" Name="btnOpenAudioFileButton" Click="btnOpenAudioFile_Click" Margin="5">Open Audio Folder</Button>
+            
 
             <TextBlock x:Name="TotalFilesText" Margin="5,0" VerticalAlignment="Center" />
             <TextBlock x:Name="LengthFilesText" Margin="5,0" VerticalAlignment="Center" />
+            
         </StackPanel>
+        
 
-        <StackPanel Grid.Column="2" Grid.Row="0" Grid.RowSpan="3" Margin="5" VerticalAlignment="Top">
+        <StackPanel Grid.Column="2" Grid.Row="2" Grid.RowSpan="3" Margin="5" VerticalAlignment="Top">
             <WrapPanel Width="260" HorizontalAlignment="Left">
                 <Button Margin="5" Content="alfabetycznie" Click="btnsort1"/>
                 <Button Margin="5" Content="alfabetycznie od tyłu" Click="btnsort2"/>
@@ -69,6 +104,10 @@
                 <Button Margin="5" Name="btnPlayAlbum" Content="Odtwórz album" Click="btnPlayAlbum_Click"/>
             </WrapPanel>
             <CheckBox Margin="5" Name="chkSortByAlbum" Content="Sortuj po albumie" />
+            <StackPanel Orientation="Horizontal" Margin="5">
+                <Slider x:Name="VolumeSlider" Value="50" Maximum="100" Minimum="0" Margin="0,0,8,0" Width="150" ValueChanged="VolumeSlider_ValueChanged"/>
+                <TextBlock x:Name="VolumeValueText" VerticalAlignment="Center" Text="50%"/>
+            </StackPanel>
 
 
 
@@ -79,7 +118,7 @@
                 <StackPanel x:Name="AlbumsPanel" />
             </ScrollViewer>
         </Border>
-        <Image Grid.Column="3" Grid.Row="2" Name="NowPlayingCover" VerticalAlignment="Center" HorizontalAlignment="Center" Stretch="Uniform" Margin="5" Source="{Binding NowPlayingCover}" />
+        <Image Grid.Column="3" Grid.Row="0" Name="NowPlayingCover" VerticalAlignment="Center" HorizontalAlignment="Center" Stretch="Uniform" Margin="5" Source="{Binding NowPlayingCover}" />
 
         <Grid Grid.Row="3" Grid.Column="2" Margin="10">
             <Grid.RowDefinitions>

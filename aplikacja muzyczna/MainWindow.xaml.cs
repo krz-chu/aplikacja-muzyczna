@@ -8,7 +8,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Media;
-using System.Windows.Controls;
 using WinForms = System.Windows.Forms;
 using TagLib;
 using System.Windows.Media.Imaging;
@@ -18,13 +17,13 @@ namespace aplikacja_muzyczna
 {
     public class AudioItem : INotifyPropertyChanged
     {
-        public string Name { get; set; }
-        public string FilePath { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string FilePath { get; set; } = string.Empty;
         public long SizeBytes { get; set; }
         public string? Subtitle { get; set; }
         public ImageSource? CoverSmall { get; set; }
         public ImageSource? CoverLarge { get; set; }
-        private string _performer;
+        private string _performer = string.Empty;
         public string Performer
         {
             get => _performer;
@@ -38,7 +37,7 @@ namespace aplikacja_muzyczna
             }
         }
 
-        private string _album;
+        private string _album = string.Empty;
         public string Album
         {
             get => _album;
@@ -100,18 +99,24 @@ namespace aplikacja_muzyczna
         private DispatcherTimer timer;
         private int currentIndex = -1;
         private bool isPlaying = false;
-        private readonly string[] allowedExt = new[] { ".mp3", ".wav" };
+        private readonly string[] allowedExt = new[] { ".mp3" };
         private readonly Random rng = new Random();
         private bool playingAlbum = false;
         private string? currentAlbum = null;
         private System.Collections.Generic.List<AudioItem> currentAlbumItems = new System.Collections.Generic.List<AudioItem>();
         private int currentAlbumIndex = -1;
+        private TimeSpan? pendingSeek = null;
+        private bool pendingResume = false;
 
         public MainWindow()
         {
             InitializeComponent();
 
             FilesList.ItemsSource = audioFiles;
+
+            // ustaw początkową głośność na wartość suwaka
+            mediaPlayer.Volume = (VolumeSlider?.Value ?? 50) / 100.0;
+            if (VolumeValueText != null) VolumeValueText.Text = $"{(int)(VolumeSlider?.Value ?? 50)}%";
 
             timer = new DispatcherTimer();
             timer.Interval = TimeSpan.FromSeconds(1);
@@ -120,6 +125,14 @@ namespace aplikacja_muzyczna
 
             mediaPlayer.MediaEnded += MediaPlayer_MediaEnded;
             mediaPlayer.MediaOpened += MediaPlayer_MediaOpened;
+        }
+
+        private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            var val = e.NewValue;
+            mediaPlayer.Volume = val / 100.0;
+            if (VolumeValueText != null)
+                VolumeValueText.Text = $"{(int)val}%";
         }
 
         private void btnOpenAudioFile_Click(object sender, RoutedEventArgs e)
@@ -380,7 +393,7 @@ namespace aplikacja_muzyczna
             return $"{len:0.##} {sizes[order]}";
         }
 
-        void timer_Tick(object sender, EventArgs e)
+        void timer_Tick(object? sender, EventArgs e)
         {
             if (mediaPlayer.Source != null && mediaPlayer.NaturalDuration.HasTimeSpan)
             {
@@ -527,7 +540,7 @@ namespace aplikacja_muzyczna
             }
         }
 
-        private void MediaPlayer_MediaEnded(object sender, EventArgs e)
+        private void MediaPlayer_MediaEnded(object? sender, EventArgs e)
         {
             if (playingAlbum && currentAlbumItems != null && currentAlbumIndex >= 0)
             {
@@ -566,12 +579,29 @@ namespace aplikacja_muzyczna
             }
         }
 
-        private void MediaPlayer_MediaOpened(object sender, EventArgs e)
+        private void MediaPlayer_MediaOpened(object? sender, EventArgs e)
         {
             if (currentIndex >= 0 && currentIndex < audioFiles.Count && mediaPlayer.NaturalDuration.HasTimeSpan)
             {
                 audioFiles[currentIndex].Duration = mediaPlayer.NaturalDuration.TimeSpan;
             }
+            // jeśli mamy pendingSeek ustawiony, ustaw pozycję i wznowienie
+            try
+            {
+                if (pendingSeek.HasValue)
+                {
+                    mediaPlayer.Position = pendingSeek.Value;
+                    pendingSeek = null;
+                }
+                if (pendingResume)
+                {
+                    mediaPlayer.Play();
+                    isPlaying = true;
+                    btnPlay.Content = "Pause";
+                    pendingResume = false;
+                }
+            }
+            catch { }
         }
 
         private void FilesList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -581,82 +611,153 @@ namespace aplikacja_muzyczna
                 PlayAt(FilesList.SelectedIndex);
             }
         }
-
         private void btnSubtitle_Click(object sender, RoutedEventArgs e)
         {
             if (currentIndex < 0 || currentIndex >= audioFiles.Count)
             {
-                System.Windows.MessageBox.Show("Brak aktualnie wybranego pliku.", "Brak pliku", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show(
+                    "Brak aktualnie wybranego pliku.",
+                    "Brak pliku",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
                 return;
             }
 
             var item = audioFiles[currentIndex];
-            var existing = string.IsNullOrWhiteSpace(item.Subtitle) ? "Brak napisów" : item.Subtitle;
-            string prompt = existing + "\n\nWpisz nowe napisy:";
-            string result = Interaction.InputBox(prompt, "Zmień napisy", existing, 200, 200);
-            if (result == null) return; // cancelled
 
-            // jeśli wpisano "Brak napisów" lub pusty - usuń
-            var newText = string.IsNullOrWhiteSpace(result) || result == "Brak napisów" ? null : result.Trim();
+            string existing =
+                string.IsNullOrWhiteSpace(item.Subtitle)
+                ? ""
+                : item.Subtitle;
 
-            // Zamknij MediaPlayer przed zapisem, aby zwolnić uchwyt do pliku
-            var wasPlaying = isPlaying;
-            var currentSource = mediaPlayer.Source?.LocalPath;
-                try
+            string result = Interaction.InputBox(
+                "Wpisz nowe napisy:",
+                "Zmień napisy",
+                existing,
+                200,
+                200);
+
+            // anulowano
+            if (result == null)
+                return;
+
+            string? newText =
+                string.IsNullOrWhiteSpace(result)
+                ? null
+                : result.Trim();
+
+            bool wasPlaying = isPlaying;
+            TimeSpan currentPos = mediaPlayer.Position;
+
+            try
+            {
+                //
+                // WAŻNE:
+                // najpierw zatrzymaj i zamknij player
+                //
+                mediaPlayer.Stop();
+                mediaPlayer.Close();
+
+                isPlaying = false;
+
+                //
+                // daj systemowi chwilę na zwolnienie pliku
+                //
+                System.Threading.Thread.Sleep(300);
+
+                //
+                // zapis tagów
+                //
+                using (var file = TagLib.File.Create(item.FilePath))
                 {
-                    try { mediaPlayer.Close(); } catch { }
+                    //
+                    // wymuś ID3v2
+                    //
+                    var id3 =
+                        file.GetTag(
+                            TagTypes.Id3v2,
+                            true) as TagLib.Id3v2.Tag;
 
-                    // Zapis wykonujemy na kopii tymczasowej, aby ominąć blokadę pliku.
-                    SaveTagsToTemp(item.FilePath, tfile =>
+                    if (id3 != null)
                     {
-                        var id3 = tfile.GetTag(TagLib.TagTypes.Id3v2, true) as TagLib.Id3v2.Tag;
-                        if (id3 != null)
-                        {
-                            var existingFrame = TagLib.Id3v2.UserTextInformationFrame.Get(id3, "Napis", false);
-                            if (!string.IsNullOrWhiteSpace(newText))
-                            {
-                                var frame = TagLib.Id3v2.UserTextInformationFrame.Get(id3, "Napis", true);
-                                frame.Text = new[] { newText };
-                            }
-                            else
-                            {
-                                if (existingFrame != null)
-                                    id3.RemoveFrame(existingFrame);
-                            }
-                        }
-                        else
-                        {
-                            // jeśli brak ID3v2, zapisz do Comment jako fallback
-                            tfile.Tag.Comment = newText ?? string.Empty;
-                        }
-                    });
+                        //
+                        // usuń stary frame
+                        //
+                        var oldFrame =
+                            TagLib.Id3v2.UserTextInformationFrame.Get(
+                                id3,
+                                "Napis",
+                                false);
 
-                    item.Subtitle = newText;
-                    if (SubtitleText != null)
-                        SubtitleText.Text = string.IsNullOrWhiteSpace(item.Subtitle) ? "Brak napisów" : item.Subtitle;
-                }
-                catch (Exception ex)
-                {
-                    System.Windows.MessageBox.Show($"Nie można zapisać napisów: {ex.Message}", "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                finally
-                {
-                    // Przywróć odtwarzacz jeśli wcześniej grał ten plik
-                    try
-                    {
-                        if (wasPlaying)
+                        if (oldFrame != null)
                         {
-                            if (!string.IsNullOrWhiteSpace(currentSource) && Path.GetFullPath(currentSource ?? "") == Path.GetFullPath(item.FilePath))
-                            {
-                                mediaPlayer.Open(new Uri(item.FilePath));
-                                mediaPlayer.Play();
-                                isPlaying = true;
-                            }
+                            id3.RemoveFrame(oldFrame);
+                        }
+
+                        //
+                        // dodaj nowy jeśli istnieje tekst
+                        //
+                        if (!string.IsNullOrWhiteSpace(newText))
+                        {
+                            var frame =
+                                TagLib.Id3v2.UserTextInformationFrame.Get(
+                                    id3,
+                                    "Napis",
+                                    true);
+
+                            frame.Text = new[] { newText };
                         }
                     }
-                    catch { }
+
+                    //
+                    // fallback do Comment
+                    //
+                    file.Tag.Comment = newText ?? "";
+
+                    //
+                    // SAVE
+                    //
+                    file.Save();
                 }
+
+                //
+                // aktualizacja UI
+                //
+                item.Subtitle = newText;
+
+                if (SubtitleText != null)
+                {
+                    SubtitleText.Text =
+                        string.IsNullOrWhiteSpace(newText)
+                        ? "Brak napisów"
+                        : newText;
+                }
+
+                //
+                // otwórz ponownie audio
+                //
+                mediaPlayer.Open(new Uri(item.FilePath));
+
+                pendingSeek = currentPos;
+                pendingResume = wasPlaying;
+
+                System.Windows.MessageBox.Show(
+                    "Napisy zapisane poprawnie.",
+                    "OK",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(
+                    $"Nie można zapisać napisów:\n\n{ex.Message}",
+                    "Błąd",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
+        
 
         private void btnsort1(object sender, RoutedEventArgs e)
         {
@@ -717,8 +818,7 @@ namespace aplikacja_muzyczna
                                     .Distinct()
                                     .ToList();
 
-            // normalize primary
-            if (!string.IsNullOrWhiteSpace(primary)) primary = primary;
+            // normalize primary (no-op removed)
 
             var orderedAlbums = new System.Collections.Generic.List<string>();
             if (!string.IsNullOrWhiteSpace(primary) && albums.Contains(primary))
@@ -774,23 +874,6 @@ namespace aplikacja_muzyczna
             foreach (var it in snapshot) audioFiles.Add(it);
         }
 
-        // Save tag changes by operating on a temporary copy, then replace original file.
-        private void SaveTagsToTemp(string originalPath, Action<TagLib.File> modify)
-        {
-            var temp = Path.GetTempFileName();
-            try
-            {
-                System.IO.File.Copy(originalPath, temp, true);
-                using var tfile = TagLib.File.Create(temp);
-                modify(tfile);
-                tfile.Save();
-                // replace original
-                System.IO.File.Copy(temp, originalPath, true);
-            }
-            finally
-            {
-                try { System.IO.File.Delete(temp); } catch { }
-            }
-        }
+        
     }
 }
