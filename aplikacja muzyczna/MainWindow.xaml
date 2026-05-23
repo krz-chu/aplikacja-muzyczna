@@ -94,10 +94,10 @@
         
 
         <StackPanel Grid.Column="2" Grid.Row="2" Grid.RowSpan="3" Margin="5" VerticalAlignment="Top">
-            <WrapPanel Width="260" HorizontalAlignment="Left">
-                <Button Margin="5" Content="alfabetycznie" Click="btnsort1"/>
-                <Button Margin="5" Content="alfabetycznie od tyłu" Click="btnsort2"/>
-                <Button Margin="5" Content="losowo" Click="btnsort3"/>
+            <WrapPanel Width="270" HorizontalAlignment="Left">
+                <Button Margin="5" Content="Alfabetycznie" Click="btnsort1"/>
+                <Button Margin="5" Content="Alfabetycznie od tyłu" Click="btnsort2"/>
+                <Button Margin="5" Content="Losowo" Click="btnsort3"/>
             </WrapPanel>
             <WrapPanel Width="260" HorizontalAlignment="Left">
                 <Button Margin="5" Name="btnChangeAlbum" Content="Zmień album (aktualny plik)" Click="btnChangeAlbum_Click"/>

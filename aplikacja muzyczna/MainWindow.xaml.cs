@@ -12,7 +12,7 @@ using WinForms = System.Windows.Forms;
 using TagLib;
 using System.Windows.Media.Imaging;
 using Microsoft.VisualBasic;
-//Install-Package TagLibSharp -Version 2.3.0 \\ w "konsola menedżera pa
+//Install-Package TagLibSharp -Version 2.3.0 \\ w "konsola menedżera pakietów" w Visual Studio, jeśli brakuje tej biblioteki
 namespace aplikacja_muzyczna
 {
     public class AudioItem : INotifyPropertyChanged
