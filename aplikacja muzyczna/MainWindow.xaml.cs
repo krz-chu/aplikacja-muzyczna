@@ -13,6 +13,7 @@ using TagLib;
 using System.Windows.Media.Imaging;
 using Microsoft.VisualBasic;
 //Install-Package TagLibSharp -Version 2.3.0 \\ w "konsola menedżera pakietów" w Visual Studio, jeśli brakuje tej biblioteki
+//problem: gdzy zmieniasz album w aplikacji to nie zapisuje zmiany tego albumu do pliku tylko pozostaje ta zmiana w aplikacji w aplikacji
 namespace aplikacja_muzyczna
 {
     public class AudioItem : INotifyPropertyChanged
@@ -168,7 +169,7 @@ namespace aplikacja_muzyczna
             {
                 var item = new AudioItem
                 {
-                    Name = Path.GetFileName(fi.FullName),
+                    Name = String.IsNullOrEmpty(fi.Name)? fi.Name : Path.GetFileName(fi.FullName),
                     FilePath = fi.FullName,
                     SizeBytes = fi.Length,
                     Duration = null,
@@ -294,7 +295,6 @@ namespace aplikacja_muzyczna
             return "-";
         }
 
-        // (method removed to avoid duplicate CreateBitmapImage definitions)
 
         private void RefreshAlbumsPanel()
         {
@@ -652,28 +652,13 @@ namespace aplikacja_muzyczna
 
             try
             {
-                //
-                // WAŻNE:
-                // najpierw zatrzymaj i zamknij player
-                //
+                
                 mediaPlayer.Stop();
                 mediaPlayer.Close();
-
-                isPlaying = false;
-
-                //
-                // daj systemowi chwilę na zwolnienie pliku
-                //
+                isPlaying = false;          
                 System.Threading.Thread.Sleep(300);
-
-                //
-                // zapis tagów
-                //
                 using (var file = TagLib.File.Create(item.FilePath))
                 {
-                    //
-                    // wymuś ID3v2
-                    //
                     var id3 =
                         file.GetTag(
                             TagTypes.Id3v2,
@@ -681,9 +666,6 @@ namespace aplikacja_muzyczna
 
                     if (id3 != null)
                     {
-                        //
-                        // usuń stary frame
-                        //
                         var oldFrame =
                             TagLib.Id3v2.UserTextInformationFrame.Get(
                                 id3,
@@ -694,10 +676,6 @@ namespace aplikacja_muzyczna
                         {
                             id3.RemoveFrame(oldFrame);
                         }
-
-                        //
-                        // dodaj nowy jeśli istnieje tekst
-                        //
                         if (!string.IsNullOrWhiteSpace(newText))
                         {
                             var frame =
@@ -709,21 +687,9 @@ namespace aplikacja_muzyczna
                             frame.Text = new[] { newText };
                         }
                     }
-
-                    //
-                    // fallback do Comment
-                    //
                     file.Tag.Comment = newText ?? "";
-
-                    //
-                    // SAVE
-                    //
                     file.Save();
                 }
-
-                //
-                // aktualizacja UI
-                //
                 item.Subtitle = newText;
 
                 if (SubtitleText != null)
@@ -733,10 +699,7 @@ namespace aplikacja_muzyczna
                         ? "Brak napisów"
                         : newText;
                 }
-
-                //
                 // otwórz ponownie audio
-                //
                 mediaPlayer.Open(new Uri(item.FilePath));
 
                 pendingSeek = currentPos;

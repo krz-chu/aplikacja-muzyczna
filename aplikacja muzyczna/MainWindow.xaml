@@ -118,6 +118,7 @@
                 <StackPanel x:Name="AlbumsPanel" />
             </ScrollViewer>
         </Border>
+        
         <Image Grid.Column="3" Grid.Row="0" Name="NowPlayingCover" VerticalAlignment="Center" HorizontalAlignment="Center" Stretch="Uniform" Margin="5" Source="{Binding NowPlayingCover}" />
 
         <Grid Grid.Row="3" Grid.Column="2" Margin="10">
